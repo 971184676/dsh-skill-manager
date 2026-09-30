@@ -231,8 +231,93 @@ async function runGit(args, cwd, signal) {
 }
 //#endregion
 
+//#region skill provider
+/**
+ * Exposes the whole discovered library to `ctx.skills` so any skill can be
+ * loaded in a conversation through the `skill` tool.
+ *
+ * The registry merges providers by rank and drops a same-name candidate when a
+ * higher-priority one already exists. `dsh-skill-filesystem` uses 100–600
+ * (project → user → bundled), so this provider takes a high rank: skills that
+ * DSH already provides keep their copy, and the registry only falls back to the
+ * library for names no other provider claims (e.g. a Codex- or Gemini-only
+ * skill). That adds coverage without ever shadowing the active tool's copy.
+ */
+const LIBRARY_SKILL_RANK = 900
+
+class LibrarySkillProvider {
+  constructor(service, control) {
+    this.name = 'skill-manager-library'
+    this.service = service
+    this.control = control
+    control.signal.addEventListener('abort', () => {}, { once: true })
+  }
+
+  async list(options) {
+    options?.signal?.throwIfAborted()
+    let data
+    try {
+      // The service cache keeps this cheap; the registry calls list() on every read.
+      data = await this.service.scan(options?.signal)
+    } catch (error) {
+      if (options?.signal?.aborted === true) throw error
+      return { candidates: [], complete: false }
+    }
+    const candidates = []
+    for (const skill of data.skills) {
+      if (!NAME_RE.test(skill.name)) continue
+      if (skill.invalid) continue
+      // Prefer an editable installation so the loaded skill has a real base dir.
+      const installation = skill.installations.find((i) => i.editable) ?? skill.installations[0]
+      if (!installation) continue
+      candidates.push({
+        name: skill.name,
+        description: skill.description || `Skill ${skill.name}`,
+        invocation: { modelInvocable: true, userInvocable: true },
+        source: 'custom',
+        provider: this.name,
+        rank: LIBRARY_SKILL_RANK,
+        locator: { path: installation.path, id: skill.id },
+        resourceBase: { kind: 'directory', path: installation.path },
+        metadata: { category: skill.category, tools: skill.tools, installCount: skill.installCount },
+      })
+    }
+    return { candidates, complete: true }
+  }
+
+  async get(candidate, options) {
+    options?.signal?.throwIfAborted()
+    const locator = candidate.locator
+    const dir = locator?.path
+    if (!dir) return undefined
+    const meta = await readSkillMeta(dir).catch(() => undefined)
+    if (!meta || meta.name !== candidate.name) return undefined
+    let body = ''
+    try {
+      const raw = await readFile(join(dir, SKILL_FILE), 'utf8')
+      const fm = parseFrontmatter(raw)
+      body = fm ? fm.body.trim() : raw.trim()
+    } catch { return undefined }
+    return {
+      name: meta.name,
+      description: meta.description || candidate.description,
+      invocation: { modelInvocable: true, userInvocable: true },
+      source: 'custom',
+      provider: this.name,
+      resourceBase: { kind: 'directory', path: dir },
+      path: join(dir, SKILL_FILE),
+      content: body,
+    }
+  }
+}
+//#endregion
+
 //#region service
 export class SkillManagerService extends TypertRemoteService {
+  // The skill registry is the seam that makes discovered skills invocable in chat
+  // (the `skill` tool). It is a hard dependency: without it the library would be
+  // view-only. `typert` is required by the registry layer this registration joins.
+  static inject = ['skills', 'typert']
   // Schemastery validates a default value against the field schema, so a path
   // that needs runtime evaluation cannot be a lazy function default here. The
   // home defaults to '' and is resolved to dshHomePath('skill-manager') in the
@@ -242,6 +327,8 @@ export class SkillManagerService extends TypertRemoteService {
     includePluginCache: z.boolean().default(false),
     extraRoots: z.array(z.string()).default([]),
     cacheTtlMs: z.number().min(0).default(CACHE_TTL_DEFAULT_MS),
+    publishSkills: z.boolean().default(true),
+    onlyModelInvocable: z.boolean().default(false),
   })
 
   constructor(ctx, config = {}) {
@@ -253,6 +340,11 @@ export class SkillManagerService extends TypertRemoteService {
     this.cache = { at: 0, data: undefined }
     this.loaded = false
     ctx.effect(() => async () => { this.loaded = false }, 'skill-manager: unload')
+    // Publish every discovered skill into the registry so `ctx.skills` (and the
+    // `skill` tool) can load them in a conversation.
+    if (cfg.publishSkills) {
+      ctx.effect(() => ctx.skills.registerProvider((control) => new LibrarySkillProvider(this, control)), 'skill-manager: skill provider')
+    }
   }
 
   async ensureLoaded() {

@@ -1,8 +1,8 @@
 # 技能仓库 · DSH Skill Manager
 
-> **一个装进 DeepSeek Harness 的"全机器技能库管理器"** —— 把散落在 Claude / Codex / Gemini / DSH 等各个 AI 工具里的技能**收拢到一处**,统一查看、分类、安装、删除。
+> **让 DSH 里"看不见、复用不了"的技能重新可见、可用。** 一个装进 DeepSeek Harness 的"全机器技能库管理器"——把散落在 Claude / Codex / Gemini / DSH 等各个 AI 工具里的技能**收拢到一处**,统一查看、分类、安装、删除。
 >
-> Machine-wide AI skill library manager for the DeepSeek Harness — discover, categorize, install, and remove skills across **every** AI tool on your machine.
+> Make the skills you already downloaded **visible and reusable inside DSH**. A machine-wide skill library manager for the DeepSeek Harness — discover, de-duplicate, categorize, install, and remove skills across **every** AI tool on your machine.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.2.0--rc.2-6f42c1)](https://github.com/deepseek-ai)
@@ -12,14 +12,35 @@
 
 ## 😩 你是不是也这样?
 
-你同时用好几个 AI 工具 —— Claude、Codex、Gemini、DeepSeek Harness —— 于是:
+**痛点一:DSH 里看不到技能库**
+你在别处下载了一大堆 skill,但装进 DSH 之后——**看不见**。不知道装了哪些、叫什么、干什么用。技能对 DSH 来说像是一个"黑盒目录"。
+
+**痛点二:下载的 skill 复用不了**
+明明已经下载到电脑上了,换一个工具就用不了;或者根本想不起来自己装过什么,于是又去下载一遍。**技能躺在硬盘上,却等于不存在。**
+
+**痛点三:多个 Agent 的技能目录一片混乱**
+你同时用 Claude、Codex、Gemini、DeepSeek Harness,于是:
 
 - 技能散落在 `~/.claude/skills`、`~/.codex/skills`、`~/.gemini/skills`、`~/.agents/skills` 好几个地方
-- **同一个技能装了好几份**,重复、占空间、还可能版本不一致
-- 想知道"我到底装了多少技能"只能一个个文件夹翻
-- 想分类、想清理某个技能,得手动去文件夹里删
+- **同一个技能装了好几份**,重复、占空间、版本还不一致
+- 想知道"我到底装了多少"只能一个个文件夹翻
+- 想清理某个技能,得手动去对应文件夹里删——**搞不好删错工具的那份**
 
-**技能仓库**把这一切收进一个面板:一次扫描,全机器技能尽收眼底。
+**技能仓库**把这一切收进 DSH 侧边栏一个面板:**一次扫描,全机器技能尽收眼底**。
+
+---
+
+## 💡 它是怎么帮上忙的
+
+| 你遇到的 | 技能仓库做的 |
+|---|---|
+| 技能看不见 | 侧边栏面板**列出全部技能**——名称、描述、分类、装在哪些工具里,一目了然 |
+| 装了却用不上 | 技能**可见即可复用**:只要位于 DSH 加载的根目录,**在对话中就能直接调用** |
+| 到处找技能 | **全机器扫描** `~/.claude`、`~/.codex`、`~/.gemini`、`~/.agents` 及 DSH 内置目录 |
+| 重复/版本不一 | 按 `name` **合并去重**,一条记录列出**全部安装位置** |
+| 清理混乱 | 统一面板删除(进回收站可恢复),**不用再去猜哪个目录对应哪个工具** |
+
+> **关于"在对话中调用"**:调用本身由 **DSH 原生技能机制**完成——它会自动加载技能根目录。本插件负责让这些技能**可见、可管、装对位置**;一旦就位,你在对话里就能像平常一样使用它们。这不是"另一个调用入口",而是**把原本看不见、想不起、用不上的技能重新接回你的工作流**。
 
 ---
 
