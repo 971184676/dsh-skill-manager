@@ -15,6 +15,14 @@
     "gemini"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/971184676/dsh-skill-manager.git"
+  },
+  "bugs": {
+    "url": "https://github.com/971184676/dsh-skill-manager/issues"
+  },
+  "homepage": "https://github.com/971184676/dsh-skill-manager#readme",
   "type": "module",
   "main": "index.js",
   "exports": {

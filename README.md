@@ -65,7 +65,7 @@
 
 1. 克隆本仓库:
    ```bash
-   git clone <this-repo-url> skill-manager
+   git clone https://github.com/971184676/dsh-skill-manager.git
    ```
 2. 在你的 DSH profile(`~/.dsh/profiles/desktop/package.json`)里,把插件**链接**进去:
    ```json
