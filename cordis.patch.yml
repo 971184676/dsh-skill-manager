@@ -1,0 +1,8 @@
+# The skill-library manager row. The Host half (index.js) is a TypertRemoteService,
+# so a single enabled row mounts the machine-wide scanner plus the ctx.remote.skillManager
+# namespace the Client panel calls. The Client half (client.js) is loaded by the Web page
+# from the same package's ./client export.
+- insert:
+    - id: skill-manager
+      name: '@local/skill-manager'
+      config: {}

@@ -1,0 +1,50 @@
+{
+  "name": "@local/skill-manager",
+  "version": "1.0.0",
+  "description": "技能仓库 · Machine-wide AI skill library manager for the DeepSeek Harness: discover, categorize, install, and remove skills across every AI tool on the machine.",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "cordis",
+    "skill",
+    "skills",
+    "skill-manager",
+    "agent",
+    "claude-code",
+    "codex",
+    "gemini"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./remote": "./remote.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "external": ["@deepseek-ai/dsh-api-gateway/client"],
+      "inject": [
+        "@deepseek-ai/dsh-api-gateway",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  },
+  "//": "All @deepseek-ai runtime packages are provided by the DeepSeek Harness installation. A linked profile bundle may only import a DSH package that it declares as a peerDependency, so every one of them is declared here and none is a hard dependency. The @local/ scope reflects a link-based local install into a DSH profile (see README); the project source lives in this repository.",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2",
+    "@deepseek-ai/schemastery": "~3.18.4",
+    "@deepseek-ai/dsh-home-paths": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-atomic-write": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-native-command": "0.2.0-rc.2"
+  }
+}
