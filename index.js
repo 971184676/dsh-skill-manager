@@ -338,6 +338,7 @@ export class SkillManagerService extends TypertRemoteService {
     this.store = new Store(cfg.home !== '' ? cfg.home : dshHomePath('skill-manager'))
     this.catalog = { categories: [], overrides: {}, aliases: {}, favorites: {}, roots: [] }
     this.cache = { at: 0, data: undefined }
+    this.pendingScan = undefined
     this.loaded = false
     ctx.effect(() => async () => { this.loaded = false }, 'skill-manager: unload')
     // Publish every discovered skill into the registry so `ctx.skills` (and the
@@ -416,6 +417,16 @@ export class SkillManagerService extends TypertRemoteService {
     await this.ensureLoaded()
     const now = Date.now()
     if (this.cache.data && now - this.cache.at < this.config.cacheTtlMs) return this.cache.data
+    // Single-flight: several readers (the skill registry during system-prompt
+    // assembly, the panel, the picker) can ask at once. Without this guard each
+    // one starts its own full disk walk, which starves the host at boot.
+    if (this.pendingScan !== undefined) return this.pendingScan
+    this.pendingScan = this.runScan(signal).finally(() => { this.pendingScan = undefined })
+    return this.pendingScan
+  }
+
+  async runScan(signal) {
+    const now = Date.now()
     const { roots } = await this.resolveRoots()
     const categories = this.effectiveCategories()
     /** @type {Map<string, any>} */

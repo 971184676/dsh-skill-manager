@@ -39,10 +39,13 @@
       "external": ["@deepseek-ai/dsh-api-gateway/client"],
       "inject": [
         "@deepseek-ai/dsh-api-gateway",
-        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-layout",
-        "@deepseek-ai/dsh-client-ui-sidebar"
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-input-trigger",
+        "@deepseek-ai/dsh-client-ui-conversation"
       ]
     }
   },

@@ -617,6 +617,11 @@ window.__ModuleLoader__.load({
     }
 
     //#region plugin entry
+    // `slots`/`locale`/`layout`/`remote` are hard dependencies: the sidebar entry,
+    // the management panel and the Host namespace all need them. The composer pair
+    // (`inputTriggers`, `sessions`) is resolved optionally in `apply` so a profile
+    // without the composer still gets the management panel instead of a plugin that
+    // never activates.
     const inject = ['slots', 'locale', 'layout', 'remote']
 
     function apply(ctx) {
@@ -657,6 +662,92 @@ window.__ModuleLoader__.load({
         skillDetail: call('skillDetail'),
       }
       ctx.effect(() => async () => { await mountPromise; if (unmount) await unmount() }, 'ui-skill-manager: remote mount')
+
+      // Composer "/" picker: typing / in the message box lists every library
+      // skill, grouped by category; picking one inserts an "@name " reference into
+      // the draft. The framework owns the draft span/CAS and the insertion (the
+      // `onPick` → `{ text }` outcome is applied through the scoped
+      // `slash/input-insert-text` event), so we never touch editor internals.
+      // This mirrors DSH's own built-in skill source (dsh-client-ui-skill), which
+      // is absent from this profile.
+      const catalogBySession = new Map()
+      async function fetchSkills(sessionId, signal) {
+        const hit = catalogBySession.get(sessionId)
+        if (hit !== undefined) return hit
+        const promise = (async () => {
+          const r = await api.scan()
+          if (r.error) throw new Error(r.error)
+          const skills = r.value?.skills ?? []
+          const cats = r.value?.categories ?? []
+          const labelOf = (id) => cats.find((c) => c.id === id)?.label ?? id
+          const orderOf = (id) => { const i = cats.findIndex((c) => c.id === id); return i < 0 ? 999 : i }
+          // Group by category: sort by category order, then name; each item carries
+          // its category label as `section` so the menu renders a header per group.
+          return skills
+            .filter((s) => !s.invalid && s.name)
+            .slice()
+            .sort((a, b) => (orderOf(a.category) - orderOf(b.category)) || a.name.localeCompare(b.name))
+            .map((s) => ({
+              name: s.name,
+              label: s.alias || s.name,
+              section: labelOf(s.category),
+              description: s.tools.join(' · '),
+            }))
+        })()
+        catalogBySession.set(sessionId, promise)
+        promise.catch(() => catalogBySession.delete(sessionId))
+        signal?.addEventListener('abort', () => { catalogBySession.delete(sessionId) }, { once: true })
+        return promise
+      }
+      // Only contribute the composer picker when the composer services are
+      // available; otherwise the management panel below still works on its own.
+      // ctx.inject activates as soon as both services resolve and never blocks the
+      // plugin's own activation.
+      ctx.inject(['inputTriggers', 'sessions'], (scope) => {
+        const inputTriggers = scope.get('inputTriggers')
+        const sessions = scope.get('sessions')
+        const source = {
+          trigger: '/',
+          // A distinct source name is required: registerSource throws when the
+          // (trigger, name) pair already exists, and DSH's own built-in skill
+          // source uses the ('/', 'skill') identity. Keeping ours distinct lets
+          // both coexist instead of one throwing during client boot.
+          name: 'skillLibrary',
+          order: 2,
+          async candidates(session, { query, signal }) {
+            if (sessions.subagentAddress(session.sessionId) !== undefined) return []
+            let items
+            try { items = await fetchSkills(session.sessionId, signal) } catch { return [] }
+            if (signal?.aborted) return []
+            const q = String(query ?? '').trim().toLowerCase()
+            if (q === '') return items
+            // Local substring filter: match name, label, or section (category).
+            return items.filter((i) =>
+              i.name.toLowerCase().includes(q) ||
+              String(i.label).toLowerCase().includes(q) ||
+              String(i.section).toLowerCase().includes(q))
+          },
+          onPick({ candidate }) {
+            return { text: `@${candidate.name} ` }
+          },
+        }
+        scope.effect(() => {
+          // Defensive: a failed contribution must never abort this plugin's
+          // activation (a throwing entry can blank the client shell).
+          try {
+            return inputTriggers.registerSource(source)
+          } catch (error) {
+            console.warn('[skill-manager] / skill picker unavailable:', error)
+            return () => {}
+          }
+        }, 'ui-skill-manager: /-skill source')
+      })
+      // A fresh library scan invalidates the memoized picker rows.
+      ctx.effect(() => {
+        const off = () => catalogBySession.clear()
+        ctx.on('connection/reset', off)
+        return off
+      }, 'ui-skill-manager: catalog invalidation')
 
       // Sidebar entry (icon) — clicking selects the keyed main panel.
       ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
