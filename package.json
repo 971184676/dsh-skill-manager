@@ -4,15 +4,27 @@
   "description": "技能仓库 · Machine-wide AI skill library manager for the DeepSeek Harness: discover, categorize, install, and remove skills across every AI tool on the machine.",
   "keywords": [
     "deepseek-harness",
+    "deepseek",
     "dsh",
     "cordis",
+    "cordis-plugin",
     "skill",
     "skills",
+    "ai-skills",
+    "agent-skills",
     "skill-manager",
+    "skill-library",
+    "skill-management",
+    "skill-discovery",
+    "skills-not-showing",
+    "SKILL.md",
+    "troubleshooting",
     "agent",
+    "ai-agent",
     "claude-code",
     "codex",
-    "gemini"
+    "gemini",
+    "llm-tools"
   ],
   "license": "MIT",
   "repository": {

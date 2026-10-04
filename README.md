@@ -10,6 +10,43 @@
 
 ---
 
+## 🔍 症状自查:**你在 DSH 里看不到、调不了技能吗?**
+
+> **一句话:** 如果你的 DSH **技能列表是空的 / 侧边栏没有技能入口 / 对话里调用技能报错**,而你明明往 `~/.claude/skills`、`~/.agents/skills`、`~/.codex/skills`、`~/.gemini/skills` 里装过技能——**这个项目就是为修这个问题写的。**
+
+| 你会看到的症状 | 常见报错 / 状态 | 根因 | 本项目 |
+|---|---|---|---|
+| 让 Agent 用技能,它说找不到 | `skill "xxx" is unknown or no longer available` | 技能没被注册进 `ctx.skills` | 注册技能提供者,把技能喂进注册表 |
+| 侧边栏**没有技能入口**,看不到装了啥 | `dsh-client-ui-skill` 状态为 `absent` | 该界面插件不在你的 profile 里 | 自带完整管理面板(侧栏 + 列表 + 详情) |
+| 打 `/` 不显示任何技能 | 技能来源为空 | 没有可用的 SkillProvider | 内置 `/` 技能选择器,按分类分组 |
+| DSH 扫不到本地技能目录 | `dsh-skill-filesystem` 状态 `inactive` | 只扫部分目录,其余工具的技能看不见 | 扫描 Claude / Codex / Gemini / AGENTS / DSH 全部根 |
+| 想知道"我到底装了几个技能" | 只能一个个文件夹翻 | 无统一视图 | 全机器扫描 + 按 `name` 合并去重 |
+| 同一技能装了好几份,版本还不一致 | 重复目录 | 无去重 | 一条记录列出**全部安装位置** |
+
+**可直接用来搜索的关键词:**
+`DSH 看不到技能` · `DSH 技能列表为空` · `dsh skill not showing` · `DeepSeek Harness skills empty` · `skill unknown or no longer available` · `skill tool returns nothing` · `dsh-skill-filesystem inactive` · `dsh-client-ui-skill absent` · `SKILL.md 不生效` · `技能库不显示` · `AI 技能管理` · `machine-wide skill manager`
+
+📖 **逐条排障手册 → [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**(4 个断点分别判断、装完仍看不到的检查清单)
+
+<details>
+<summary><b>🇬🇧 English: symptoms &amp; troubleshooting (click to expand)</b></summary>
+
+**If your DeepSeek Harness shows no skills, this project fixes that.**
+
+| Symptom | Error / status you may see | Root cause | What this project does |
+|---|---|---|---|
+| Agent can't load a skill | `skill "xxx" is unknown or no longer available` | Skills never registered into `ctx.skills` | Registers a SkillProvider that feeds the registry |
+| No skill entry in the sidebar | `dsh-client-ui-skill` is `absent` | That UI plugin is not in your profile | Ships its own management panel |
+| Typing `/` lists no skills | empty skill source | No available SkillProvider | Adds a `/` picker grouped by category |
+| DSH misses local skill dirs | `dsh-skill-filesystem` is `inactive` | Only some roots are scanned | Scans Claude / Codex / Gemini / AGENTS / DSH roots |
+| Duplicate skills, mismatched versions | repeated directories | No de-duplication | Merges by `name`, lists every install location |
+
+Search terms this page answers: `dsh skill not showing` · `deepseek harness skills empty` · `skill unknown or no longer available` · `dsh skill tool returns nothing` · `dsh-skill-filesystem inactive` · `dsh-client-ui-skill absent` · `SKILL.md not loaded` · `machine-wide AI skill manager` · `claude code codex gemini skills unified`
+
+</details>
+
+---
+
 ## 😩 你是不是也这样?
 
 **痛点一:DSH 里看不到技能库**
