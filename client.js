@@ -148,6 +148,8 @@ window.__ModuleLoader__.load({
       body: '正文',
       frontmatter: 'Frontmatter',
       tools: '来源',
+      noSkillsAnywhere: '本机还没有检测到任何技能目录。试试运行 npx skills find <关键词> 安装一个，或手动添加扫描路径。',
+      starProject: '⭐ Star 项目 / 分享给同样受技能困扰的朋友',
     }
     const en = {
       panel: 'Skills',
@@ -222,6 +224,8 @@ window.__ModuleLoader__.load({
       body: 'Body',
       frontmatter: 'Frontmatter',
       tools: 'Sources',
+      noSkillsAnywhere: 'No skill directories detected on this machine. Try `npx skills find <query>`, or add a scan path.',
+      starProject: '⭐ Star this project / share it with someone fighting the same problem',
     }
     //#endregion
 
@@ -271,6 +275,8 @@ window.__ModuleLoader__.load({
 .smx-inst{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:8px;margin-bottom:6px;background:var(--dsw-alias-bg-layer-2);font-size:12px}
 .smx-inst .path{color:var(--dsw-alias-label-secondary);word-break:break-all;margin:2px 0}
 .smx-status{flex:none;display:flex;align-items:center;gap:8px;padding:6px 12px;border-top:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font-size:12px;flex-wrap:wrap}
+.smx-star{margin-left:auto;color:var(--dsw-alias-label-tertiary);text-decoration:none;opacity:.7;transition:opacity .15s,color .15s}
+.smx-star:hover{opacity:1;color:var(--dsw-alias-label-primary)}
 .smx-error{color:var(--dsw-alias-state-error-primary)}
 .smx-center{flex:1;display:flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-secondary)}
 .smx-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000}
@@ -544,7 +550,11 @@ window.__ModuleLoader__.load({
             h('div', { className: 'smx-list' },
               error ? h('div', { className: 'smx-error' }, t('loadError') + ': ' + error) :
               loading && skills.length === 0 ? h('div', { className: 'smx-center' }, t('loading')) :
-              filtered.length === 0 ? h('div', { className: 'smx-center' }, t('empty')) :
+              filtered.length === 0 ? h('div', { className: 'smx-center' },
+                h('div', null, t('empty')),
+                // Distinguish "search matched nothing" from "this machine has no skills at all".
+                skills.length === 0 ? h('div', { className: 'smx-note', style: { marginTop: '10px', maxWidth: '420px' } }, t('noSkillsAnywhere')) : null,
+              ) :
               h('div', { className: 'smx-grid' }, filtered.map((s) => h('div', { key: s.id, className: 'smx-card' + (selected?.id === s.id ? ' sel' : ''), onClick: () => openDetail(s) },
                 h('h4', null, s.alias || s.name, s.conflict ? h('span', { className: 'smx-badge warn' }, '⚠ ' + t('conflict')) : null),
                 h('div', { className: 'id' }, s.id),
@@ -596,6 +606,16 @@ window.__ModuleLoader__.load({
         h('div', { className: 'smx-status' },
           h('span', null, status),
           notice ? h('span', { className: 'smx-error' }, notice) : null,
+          // A quiet, self-sustaining promotion surface: anyone who opened this panel
+          // has already decided the tool is useful — the cheapest possible moment to
+          // ask for a Star. Muted so it never competes with the actual work.
+          h('a', {
+            className: 'smx-star',
+            href: 'https://github.com/971184676/dsh-skill-manager',
+            target: '_blank',
+            rel: 'noopener noreferrer',
+            title: t('starProject'),
+          }, t('starProject')),
         ),
 
         // dialogs
