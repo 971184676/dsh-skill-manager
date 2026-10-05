@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: DSH 本身的 bug
+    url: https://github.com/deepseek-ai/deepseek-harness/issues
+    about: 如果问题出在 DSH 内核(而非本插件),请到上游仓库反馈
+  - name: 功能建议 / 想法
+    url: https://github.com/971184676/dsh-skill-manager/discussions
+    about: 提想法、路线图、想支持的工具或目录

@@ -37,6 +37,21 @@
   "homepage": "https://github.com/971184676/dsh-skill-manager#readme",
   "type": "module",
   "main": "index.js",
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "remote.js",
+    "lib/",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

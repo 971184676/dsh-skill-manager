@@ -200,13 +200,18 @@ Search terms this page answers: `dsh skill not showing` · `deepseek harness ski
 
 ```
 skill-manager/
-├── index.js          # Host 服务:扫描 / 分类 / 安装 / 删除 / 导出
-├── client.js         # Client 面板:React 侧边栏 UI(中英双语)
-├── remote.js         # Typert Remote 协议描述
-├── cordis.patch.yml  # 插件挂载行
+├── index.js           # Host 服务:扫描 / 分类 / 安装 / 删除 / 导出(依赖 DSH 运行时)
+├── client.js          # Client 面板:React 侧边栏 UI + `/` 选择器(中英双语)
+├── remote.js          # Typert Remote 协议描述(20 个方法)
+├── cordis.patch.yml   # 插件挂载行
 ├── lib/
-│   ├── remote-marker.js  # 手写 ESM 的 Remote 标记装配
-│   └── yaml.js           # 轻量 YAML 读取
+│   ├── skill-model.js       # 纯领域逻辑:frontmatter / 发现 / 合并 / 分类(零依赖,可单测)
+│   ├── remote-marker.js     # 手写 ESM 的 Remote 标记装配
+│   └── yaml.js              # 轻量 YAML 读取
+├── test/
+│   └── skill-model.test.js  # 单元测试(node --test,零依赖)
+├── tools/
+│   └── check-inject.mjs     # 注入依赖守卫(拦截"侧边栏不显示"那类故障)
 └── package.json
 ```
 
@@ -216,12 +221,16 @@ skill-manager/
 
 ```bash
 # 无需安装依赖 —— 运行时全部由 DSH 提供
-# 改完代码后,在 DSH 里重启/刷新即可生效
+
+npm test                        # 单元测试(18 项,零依赖)
+node tools/check-inject.mjs     # 校验注入依赖完整性
 ```
 
-- Host 半边(`index.js`)是 `TypertRemoteService`,提供 `ctx.remote.skillManager` 命名空间。
-- Client 半边(`client.js`)由 Web 页面从同一个包的 `./client` 导出加载。
+- **领域逻辑**(`lib/skill-model.js`)不依赖 DSH,可在任意 Node 环境直接测试。
+- **Host 半边**(`index.js`)是 `TypertRemoteService`,提供 `ctx.remote.skillManager` 命名空间。
+- **Client 半边**(`client.js`)由 Web 页面从同一个包的 `./client` 导出加载。
 - 本包是手写 ESM,因此 `@Remote` 标记是**编程式装配**(`applyRemoteMarkers`),而非装饰器解析。
+- CI 在每次 push / PR 上跑:单元测试 + manifest 校验 + 注入守卫 + 语法检查。
 
 ---
 

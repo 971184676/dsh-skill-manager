@@ -1,0 +1,68 @@
+name: 技能不可见 / Skill not showing
+description: 侧边栏没有入口、技能列表为空、或对话里调用技能报 unknown — 这是本插件要修的核心问题
+title: "[症状] "
+labels: bug, discoverability
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈!这个模板专门收集「技能看不见 / 调不了」的症状,方便复现与定位。
+
+  - type: input
+    id: symptom
+    attributes:
+      label: 你看到的具体现象(可多选)
+      multiple: true
+      options:
+        - 侧边栏没有「技能库 / Skill」入口
+        - 打 `/` 不显示任何技能
+        - 面板能打开,但技能列表是空的
+        - 只显示部分技能(其余工具目录里的看不到)
+        - 对话里让 Agent 用技能,它说 unknown / 找不到
+        - 面板打不开 / 报错
+
+  - type: input
+    id: error
+    attributes:
+      label: 完整报错原文
+      description: 粘贴报错时**保留原始字符串**(如 `skill "xxx" is unknown or no longer available`)。这正是我们用来搜索同类问题的关键。
+      placeholder: 'skill "xxx" is unknown or no longer available'
+
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DSH 版本
+      placeholder: 0.2.0-rc.2
+
+  - type: input
+    id: plugin-status
+    attributes:
+      label: 插件那一行的状态
+      description: 插件管理里 `@local/skill-manager` 这一行显示什么?
+      placeholder: active / inactive / pending / failed
+
+  - type: input
+    id: skill-dirs
+    attributes:
+      label: 你的技能装在哪些目录
+      description: 列几个,例如 `~/.claude/skills`、`~/.agents/skills`、`~/.codex/skills`
+      render: shell
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      value: |
+        1.
+        2.
+        3.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 已确认
+      options:
+        - label: 我已尝试重启 DSH
+          required: false
+        - label: 我已阅读排障手册 docs/TROUBLESHOOTING.md
+          required: false

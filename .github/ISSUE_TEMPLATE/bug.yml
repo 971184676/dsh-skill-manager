@@ -1,0 +1,40 @@
+name: Bug 报告
+description: 插件功能性 bug(扫描、分类、安装、删除、导出等)
+title: "[bug] "
+labels: bug
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 期望的行为 vs 实际的行为
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: DSH 版本 + OS + Node 版本
+      placeholder: DSH 0.2.0-rc.2 / macOS 15 / Node 22
+      render: shell
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: 若有 `operations.log` 或控制台报错,请粘贴关键部分
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索过现有 issue,确认不是重复
+          required: true
+        - label: 我已运行 `npm test`,现有测试通过(如果能运行)
+          required: false
