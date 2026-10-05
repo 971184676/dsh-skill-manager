@@ -38,7 +38,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/*.test.js"
   },
   "engines": {
     "node": ">=22"
