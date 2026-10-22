@@ -2,6 +2,24 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 新增
+
+- **合集（用户自建技能分组）** — 与 AI/手动的单值分类相互独立，一个技能可同属任意多个合集：
+  - 侧边栏新增"合集"分组（点击即筛选，`＋` 直接创建）
+  - 工具栏新增"管理合集"按钮（创建/删除合集）
+  - 技能卡片新增多选勾选框 + 批量操作栏：批量移到分类（含当场新建分类）、批量加入/移出合集（含当场新建合集）
+  - 详情抽屉新增"合集"勾选区与内联新建合集输入框
+  - Host 端新增 5 个 remote 方法：`createCollection` / `renameCollection` / `deleteCollection` / `addToCollection` / `removeFromCollection`
+  - 扫描输出：每个技能带 `collections` 数组、每个合集带成员 `count`；已不存在的技能 id 每次扫描时自动剔除
+  - 导出（Markdown / CSV / JSON）均包含合集信息
+  - 领域逻辑 `attachCollections` 抽到 `lib/skill-model.js`，可脱离 DSH 单测
+
+### 变更
+
+- `package.json`：`@deepseek-ai/*` peerDependencies 从精确锁版本改为 `>=0.2.0-rc.2 <0.3.0-0`，兼容 0.2.x 的补丁/候选版升级
+
 ## [1.0.0] — 2026-10-05
 
 首个可用版本:把散落在各个 AI 工具里的技能收拢进 DSH,重新变得**可见且可用**。
@@ -43,4 +61,5 @@
   (专门拦截导致侧边栏消失的那类依赖缺失)+ 全量语法检查。
 - 新增 Issue 模板:症状模板(收集"看不见技能"的原始报错字符串)、Bug 模板。
 
+[Unreleased]: https://github.com/971184676/dsh-skill-manager/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/971184676/dsh-skill-manager/releases/tag/v1.0.0

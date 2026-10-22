@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import {
   parseFrontmatter, skillMetaFromText, normalizeId, NAME_RE, MAX_SCAN_DEPTH,
   discoverUnderRoot, readSkillMeta, classify, effectiveCategories,
-  mergeInstallations, BUILTIN_CATEGORIES, UNCATEGORIZED,
+  mergeInstallations, attachCollections, BUILTIN_CATEGORIES, UNCATEGORIZED,
 } from '../lib/skill-model.js'
 import { parse as parseYaml } from '../lib/yaml.js'
 
@@ -202,3 +202,45 @@ test('readSkillMeta returns undefined for a directory without SKILL.md', async (
 test('MAX_SCAN_DEPTH is a small bounded value', () => {
   assert.ok(MAX_SCAN_DEPTH >= 1 && MAX_SCAN_DEPTH <= 4)
 })
+
+//#region collections
+function skillRec(id) {
+  return { id, name: id, description: '', installations: [], conflict: false, favorite: false }
+}
+
+test('attachCollections: skills gain the collections they belong to (multi-valued)', () => {
+  const skills = [skillRec('a'), skillRec('b'), skillRec('c')]
+  const collections = [
+    { id: 'daily', label: 'Daily', skillIds: ['a', 'b'] },
+    { id: 'video', label: 'Video', skillIds: ['b'] },
+  ]
+  const clean = attachCollections(skills, collections)
+  assert.equal(clean.length, 2)
+  assert.deepEqual(skills[0].collections, ['daily'])
+  assert.deepEqual(skills[1].collections.sort(), ['daily', 'video'])
+  assert.deepEqual(skills[2].collections, [])
+})
+
+test('attachCollections: prunes stale skill ids from collections', () => {
+  const skills = [skillRec('a')]
+  const clean = attachCollections(skills, [
+    { id: 'daily', label: 'Daily', skillIds: ['a', 'ghost', 'gone'] },
+  ])
+  assert.deepEqual(clean[0].skillIds, ['a'])
+  assert.deepEqual(skills[0].collections, ['daily'])
+})
+
+test('attachCollections: drops malformed collections, normalizes ids, dedupes membership', () => {
+  const skills = [skillRec('a')]
+  const clean = attachCollections(skills, [
+    { id: '  DAILY  ', label: 'Daily', skillIds: ['a'] },
+    null,
+    { label: 'no id', skillIds: ['a'] },
+  ])
+  assert.equal(clean.length, 1)
+  assert.equal(clean[0].id, 'daily')
+  assert.deepEqual(clean[0].skillIds, ['a'])
+  // membership is keyed on the collection's normalized id, not its raw spelling
+  assert.deepEqual(skills[0].collections, ['daily'])
+})
+//#endregion

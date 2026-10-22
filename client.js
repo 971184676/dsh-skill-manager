@@ -55,6 +55,11 @@ window.__ModuleLoader__.load({
         descriptor('refresh', { params: false }),
         descriptor('updateCategory'),
         descriptor('createCategory'),
+        descriptor('createCollection'),
+        descriptor('renameCollection'),
+        descriptor('deleteCollection'),
+        descriptor('addToCollection'),
+        descriptor('removeFromCollection'),
         descriptor('renameCategory'),
         descriptor('deleteCategory'),
         descriptor('setAlias'),
@@ -133,6 +138,19 @@ window.__ModuleLoader__.load({
       renameCat: '重命名',
       deleteCat: '删除分类',
       catName: '分类名称',
+      collections: '合集',
+      newCollection: '新建合集',
+      collectionPlaceholder: '输入名称，回车创建',
+      collectionEmpty: '还没有合集。把几个常用技能存成一个合集，以后点一下就调出来。',
+      deleteCollection: '删除合集',
+      deleteCollectionConfirm: '删除合集「{label}」？合集里的技能本身不会被删。',
+      manageColls: '管理合集',
+      addToCollection: '加入合集',
+      removeFromCollection: '移出合集',
+      selectedN: '已选 {n} 个',
+      moveCategory: '移到分类',
+      newCategoryHere: '＋ 新建…',
+      quickMoveTitle: '点击选择分类，直接改归类',
       trashTitle: '回收站',
       trashEmpty: '回收站是空的。',
       restore: '恢复',
@@ -209,6 +227,19 @@ window.__ModuleLoader__.load({
       renameCat: 'Rename',
       deleteCat: 'Delete category',
       catName: 'Category name',
+      collections: 'Collections',
+      newCollection: 'New collection',
+      collectionPlaceholder: 'Type a name, press Enter',
+      collectionEmpty: 'No collections yet. Bundle a few go-to skills into one and reach them with a click.',
+      deleteCollection: 'Delete collection',
+      deleteCollectionConfirm: 'Delete collection "{label}"? Skills inside it are not deleted.',
+      manageColls: 'Manage collections',
+      addToCollection: 'Add to collection',
+      removeFromCollection: 'Remove from collection',
+      selectedN: '{n} selected',
+      moveCategory: 'Move to category',
+      newCategoryHere: '＋ New…',
+      quickMoveTitle: 'Click to re-categorize this skill',
       trashTitle: 'Trash',
       trashEmpty: 'Trash is empty.',
       restore: 'Restore',
@@ -292,6 +323,21 @@ window.__ModuleLoader__.load({
 .smx-note{color:var(--dsw-alias-label-secondary);font-size:12px;margin:4px 0}
 .smx-pre{white-space:pre-wrap;word-break:break-word;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:8px;font-size:12px;max-height:50vh;overflow:auto}
 .smx-trash-item{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:8px;margin-bottom:6px;background:var(--dsw-alias-bg-layer-2);font-size:12px}
+.smx-catmenu{position:relative;display:inline-block}
+.smx-catbtn{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary);background:transparent;cursor:pointer;white-space:nowrap;line-height:1.4}
+.smx-catbtn:hover{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent)}
+.smx-menu{position:absolute;top:20px;left:0;min-width:190px;max-height:300px;overflow:auto;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l2);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:60;padding:4px}
+.smx-menu button{display:block;width:100%;text-align:left;padding:6px 8px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-primary);font-size:12px;cursor:pointer}
+.smx-menu button:hover{background:var(--dsw-alias-bg-layer-2)}
+.smx-menu button.on{font-weight:600;color:var(--dsw-alias-brand-primary)}
+.smx-menu button.new{color:var(--dsw-alias-brand-primary)}
+.smx-mrow{padding:6px 4px;display:flex;flex-direction:column;gap:6px}
+.smx-check{width:15px;height:15px;accent-color:var(--dsw-alias-brand-primary);cursor:pointer;flex:none}
+.smx-bulkbar{flex:none;display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);flex-wrap:wrap}
+.smx-bulkbar .smx-select{min-width:150px}
+.smx-colrow{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer;font-size:13px}
+.smx-colrow:hover{background:var(--dsw-alias-bg-layer-2)}
+.smx-card.picked{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
 `
     const STYLE_ID = '@local/skill-manager/SkillManager.css'
     if (typeof document !== 'undefined' && document.querySelector('style[data-plugin-css=' + JSON.stringify(STYLE_ID) + ']') === null) {
@@ -446,6 +492,89 @@ window.__ModuleLoader__.load({
     }
     //#endregion
 
+    //#region category quick-move menu
+    function CatMoveMenu({ api, skill, categories, t, onApplied }) {
+      const [open, setOpen] = useState(false)
+      const [creating, setCreating] = useState(false)
+      const [newLabel, setNewLabel] = useState('')
+      const pick = async (value) => {
+        // value: '' (back to auto) | category id | '__new__'
+        if (value === '__new__') {
+          if (!newLabel.trim()) return
+          const label = newLabel.trim()
+          const r = await api.createCategory({ label })
+          if (r.error) { onApplied(r.error); return }
+          await api.updateCategory({ name: skill.id, category: label.toLowerCase() })
+          setCreating(false); setNewLabel(''); setOpen(false)
+          onApplied()
+          return
+        }
+        const r = await api.updateCategory({ name: skill.id, category: value })
+        if (r.error) { onApplied(r.error); return }
+        setOpen(false)
+        onApplied()
+      }
+      return h('span', { className: 'smx-catmenu' },
+        h('button', { className: 'smx-catbtn', title: t('quickMoveTitle'), onClick: (e) => { e.stopPropagation(); setOpen(!open) } },
+          `${(categories.find((c) => c.id === skill.category)?.label) ?? skill.category} ⇄`),
+        open ? h('div', { className: 'smx-menu', onClick: (e) => e.stopPropagation() },
+          h('button', { className: skill.categorySource === 'auto' ? 'on' : '', onClick: () => pick('') }, t('autoCategory')),
+          categories.map((c) => h('button', { key: c.id, className: c.id === skill.category ? 'on' : '', onClick: () => pick(c.id) }, c.label)),
+          creating
+            ? h('div', { className: 'smx-mrow' },
+              h('input', { className: 'smx-input', style: { width: '100%', height: 26 }, placeholder: t('catName'), value: newLabel, onChange: (e) => setNewLabel(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') pick('__new__') } }),
+              h('div', { className: 'smx-row' },
+                h('button', { className: 'smx-btn', style: { height: 24 }, onClick: () => pick('__new__') }, t('confirm')),
+                h('button', { className: 'smx-btn', style: { height: 24 }, onClick: () => { setCreating(false); setOpen(false) } }, t('cancel')),
+              ),
+            )
+            : h('button', { className: 'new', onClick: () => setCreating(true) }, t('newCategoryHere')),
+        ) : null,
+      )
+    }
+    //#endregion
+
+    //#region collection manager dialog
+    function CollectionDialog({ api, collections, t, onClose, onDone }) {
+      const [name, setName] = useState('')
+      const [msg, setMsg] = useState('')
+      const create = async () => {
+        if (!name.trim()) return
+        const r = await api.createCollection({ label: name.trim() })
+        if (r.error) { setMsg(r.error); return }
+        setName(''); setMsg('')
+        onDone(r.value)
+      }
+      const remove = async (c) => {
+        if (!window.confirm(t('deleteCollectionConfirm', { label: c.label }))) return
+        const r = await api.deleteCollection({ name: c.id })
+        if (r.error) { setMsg(r.error); return }
+        onDone(r.value)
+      }
+      return h(Modal, { title: t('manageColls'), onClose, footer: [h('button', { key: 'c', className: 'smx-btn', onClick: onClose }, t('close'))] },
+        h('div', { className: 'smx-field' }, h('label', null, t('newCollection')),
+          h('div', { className: 'smx-row' },
+            h('input', { className: 'smx-input', value: name, placeholder: t('collectionPlaceholder'), onChange: (e) => setName(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') create() } }),
+            h('button', { className: 'smx-btn', onClick: create }, t('confirm')),
+          ),
+        ),
+        msg ? h('div', { className: 'smx-error smx-note' }, msg) : null,
+        h('div', { className: 'smx-sec' },
+          h('h5', null, t('collections')),
+          collections.length === 0 ? h('div', { className: 'smx-note' }, t('collectionEmpty')) : collections.map((c) =>
+            h('div', { key: c.id, className: 'smx-trash-item' },
+              h('div', { className: 'smx-row' },
+                h('span', { style: { flex: '1' } }, c.label),
+                h('span', { className: 'smx-note' }, c.count),
+                h('button', { className: 'smx-btn danger', onClick: () => remove(c) }, t('deleteCollection')),
+              ),
+            ),
+          ),
+        ),
+      )
+    }
+    //#endregion
+
     //#region main panel
     function SkillManagerPanel({ api, t }) {
       const [data, setData] = useState(null)
@@ -453,25 +582,40 @@ window.__ModuleLoader__.load({
       const [error, setError] = useState('')
       const [query, setQuery] = useState('')
       const [cat, setCat] = useState('all')
+      const [col, setCol] = useState(null) // active collection filter (collection id or null)
       const [tool, setTool] = useState('all')
       const [selected, setSelected] = useState(null)
+      const [sel, setSel] = useState(new Set()) // multi-select of skill ids for bulk ops
       const [detail, setDetail] = useState(null)
-      const [dialog, setDialog] = useState(null) // 'install' | 'cat' | 'trash' | 'export' | null
+      const [dialog, setDialog] = useState(null) // 'install' | 'cat' | 'trash' | 'export' | 'coll' | null
       const [notice, setNotice] = useState('')
+      const [newColl, setNewColl] = useState('') // inline "new collection" input in the detail drawer
 
       const load = useCallback(async () => {
         setLoading(true)
         const r = await api.refresh()
         setLoading(false)
-        if (r.error) { setError(r.error); return }
+        if (r.error) { setError(r.error); return null }
         setError('')
         setData(r.value)
+        return r.value
       }, [api])
+
+      // Keep the open detail drawer in sync after any catalog mutation.
+      const syncDetail = useCallback((fresh) => {
+        if (!fresh) return
+        setDetail((d) => {
+          if (!d) return d
+          const ns = fresh.skills?.find((x) => x.id === d.skill.id)
+          return ns ? { ...d, skill: ns } : d
+        })
+      }, [])
 
       useEffect(() => { load() }, [load])
 
       const skills = data?.skills ?? []
       const categories = data?.categories ?? []
+      const collections = data?.collections ?? []
       const stats = data?.stats
       const tools = useMemo(() => {
         const set = new Set()
@@ -483,11 +627,12 @@ window.__ModuleLoader__.load({
         const q = query.trim().toLowerCase()
         return skills.filter((s) => {
           if (cat !== 'all' && s.category !== cat) return false
+          if (col && !(s.collections ?? []).includes(col)) return false
           if (tool !== 'all' && !s.tools.includes(tool)) return false
           if (q && !(`${s.name} ${s.id} ${s.description}`.toLowerCase().includes(q))) return false
           return true
         })
-      }, [skills, cat, tool, query])
+      }, [skills, cat, col, tool, query])
 
       const openDetail = useCallback(async (s) => {
         setSelected(s)
@@ -500,16 +645,73 @@ window.__ModuleLoader__.load({
         if (!window.confirm(msg)) return
         const r = await api.deleteSkill({ name: skill.id, installKey })
         if (r.error) { setNotice(r.error); return }
-        setSelected(null); setDetail(null)
+        setSelected(null); setDetail(null); setSel(new Set())
         if (r.value?.catalog) setData(r.value.catalog); else load()
       }, [api, load, t])
 
       const setSkillCategory = useCallback(async (skill, category) => {
         const r = await api.updateCategory({ name: skill.id, category: category === 'auto' ? '' : category })
         if (r.error) { setNotice(r.error); return }
-        load()
-      }, [api, load])
+        const fresh = await load()
+        syncDetail(fresh)
+      }, [api, load, syncDetail])
 
+      // --- bulk operations on the current selection ---
+      const toggleSel = useCallback((id) => {
+        setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+      }, [])
+      const clearSel = useCallback(() => setSel(new Set()), [])
+      const bulkMove = async (v) => {
+        if (!v || sel.size === 0) return
+        const names = [...sel]
+        let target = v
+        if (v === '__new__') {
+          const label = window.prompt(t('newCategoryHere'))
+          if (!label?.trim()) return
+          const rc = await api.createCategory({ label: label.trim() })
+          if (rc.error) { setNotice(rc.error); return }
+          target = label.trim().toLowerCase()
+        } else if (v === '__auto__') target = ''
+        for (const id of names) {
+          const r = await api.updateCategory({ name: id, category: target })
+          if (r.error) { setNotice(r.error); break }
+        }
+        clearSel()
+        await load()
+      }
+      const bulkAdd = async (v) => {
+        if (!v || sel.size === 0) return
+        let collection = v
+        if (v === '__new__') {
+          const label = window.prompt(t('newCollection'))
+          if (!label?.trim()) return
+          const rc = await api.createCollection({ label: label.trim() })
+          if (rc.error) { setNotice(rc.error); return }
+          collection = label.trim().toLowerCase()
+        }
+        const r = await api.addToCollection({ collection, names: [...sel] })
+        if (r.error) { setNotice(r.error); return }
+        clearSel()
+        await load()
+      }
+      const bulkRemove = async (v) => {
+        if (!v || sel.size === 0) return
+        const r = await api.removeFromCollection({ collection: v, names: [...sel] })
+        if (r.error) { setNotice(r.error); return }
+        clearSel()
+        await load()
+      }
+      // Create a new collection and immediately put the given skill into it.
+      const createCollFor = async (skill) => {
+        if (!newColl.trim()) return
+        const r = await api.createCollection({ label: newColl.trim() })
+        if (r.error) { setNotice(r.error); return }
+        const id = newColl.trim().toLowerCase()
+        const r2 = await api.addToCollection({ collection: id, names: [skill.id] })
+        if (r2.error) { setNotice(r2.error); return }
+        setNewColl('')
+        syncDetail(r2.value)
+      }
       const catLabel = (id) => categories.find((c) => c.id === id)?.label ?? id
 
       // status bar
@@ -531,23 +733,51 @@ window.__ModuleLoader__.load({
           h('button', { className: 'smx-btn', disabled: loading, onClick: load }, loading ? t('refreshing') : t('refresh')),
           h('button', { className: 'smx-btn primary', onClick: () => setDialog('install') }, t('add')),
           h('button', { className: 'smx-btn', onClick: () => setDialog('cat') }, t('manageCats')),
+          h('button', { className: 'smx-btn', onClick: () => setDialog('coll') }, t('manageColls')),
           h('button', { className: 'smx-btn', onClick: () => setDialog('trash') }, t('trash')),
           h('button', { className: 'smx-btn', onClick: () => setDialog('export') }, t('export')),
         ),
 
         // body
         h('div', { className: 'smx-body' },
-          // category sidebar
+          // category + collection sidebar
           h('div', { className: 'smx-side' },
-            h('h3', null, t('allCategories')),
-            h('button', { className: 'smx-cat' + (cat === 'all' ? ' active' : ''), onClick: () => setCat('all') },
+            h('div', { className: 'smx-row', style: { padding: '0 4px' } },
+              h('h3', null, t('allCategories')),
+              h('button', { className: 'smx-btn', style: { height: 22, padding: '0 6px' }, title: t('manageCats'), onClick: () => setDialog('cat') }, '＋')),
+            h('button', { className: 'smx-cat' + (cat === 'all' && !col ? ' active' : ''), onClick: () => { setCat('all'); setCol(null) } },
               h('span', null, t('allCategories')), h('span', { className: 'count' }, skills.length)),
-            categories.map((c) => h('button', { key: c.id, className: 'smx-cat' + (cat === c.id ? ' active' : ''), onClick: () => setCat(c.id) },
+            categories.map((c) => h('button', { key: c.id, className: 'smx-cat' + (cat === c.id && !col ? ' active' : ''), onClick: () => { setCat(c.id); setCol(null) } },
               h('span', null, c.label), h('span', { className: 'count' }, c.count))),
+            h('div', { className: 'smx-row', style: { padding: '8px 4px 0' } },
+              h('h3', null, t('collections')),
+              h('button', { className: 'smx-btn', style: { height: 22, padding: '0 6px' }, title: t('manageColls'), onClick: () => setDialog('coll') }, '＋')),
+            collections.map((c) => h('button', { key: c.id, className: 'smx-cat' + (col === c.id ? ' active' : ''), onClick: () => { setCol(col === c.id ? null : c.id); setCat('all') } },
+              h('span', null, c.label), h('span', { className: 'count' }, c.count))),
+            collections.length === 0 ? h('div', { className: 'smx-note', style: { padding: '2px 8px', fontSize: 12 } }, t('collectionEmpty')) : null,
           ),
           // list + detail
           h('div', { className: 'smx-main' },
             h('div', { className: 'smx-list' },
+              sel.size > 0 ? h('div', { className: 'smx-bulkbar' },
+                h('span', { className: 'smx-note' }, t('selectedN', { n: sel.size })),
+                h('select', { className: 'smx-select', value: '', onChange: (e) => { const v = e.target.value; e.target.value = ''; if (v) bulkMove(v) } },
+                  h('option', { value: '' }, t('moveCategory')),
+                  h('option', { value: '__auto__' }, t('autoCategory')),
+                  categories.map((c) => h('option', { key: c.id, value: c.id }, c.label)),
+                  h('option', { value: '__new__' }, t('newCategoryHere')),
+                ),
+                h('select', { className: 'smx-select', value: '', onChange: (e) => { const v = e.target.value; e.target.value = ''; if (v) bulkAdd(v) } },
+                  h('option', { value: '' }, t('addToCollection')),
+                  collections.map((c) => h('option', { key: c.id, value: c.id }, c.label)),
+                  h('option', { value: '__new__' }, t('newCollection') + '…'),
+                ),
+                h('select', { className: 'smx-select', value: '', onChange: (e) => { const v = e.target.value; e.target.value = ''; if (v) bulkRemove(v) } },
+                  h('option', { value: '' }, t('removeFromCollection')),
+                  collections.map((c) => h('option', { key: c.id, value: c.id }, c.label)),
+                ),
+                h('button', { className: 'smx-btn', onClick: clearSel }, t('cancel')),
+              ) : null,
               error ? h('div', { className: 'smx-error' }, t('loadError') + ': ' + error) :
               loading && skills.length === 0 ? h('div', { className: 'smx-center' }, t('loading')) :
               filtered.length === 0 ? h('div', { className: 'smx-center' },
@@ -555,15 +785,19 @@ window.__ModuleLoader__.load({
                 // Distinguish "search matched nothing" from "this machine has no skills at all".
                 skills.length === 0 ? h('div', { className: 'smx-note', style: { marginTop: '10px', maxWidth: '420px' } }, t('noSkillsAnywhere')) : null,
               ) :
-              h('div', { className: 'smx-grid' }, filtered.map((s) => h('div', { key: s.id, className: 'smx-card' + (selected?.id === s.id ? ' sel' : ''), onClick: () => openDetail(s) },
-                h('h4', null, s.alias || s.name, s.conflict ? h('span', { className: 'smx-badge warn' }, '⚠ ' + t('conflict')) : null),
+              h('div', { className: 'smx-grid' }, filtered.map((s) => h('div', { key: s.id, className: 'smx-card' + (selected?.id === s.id ? ' sel' : '') + (sel.has(s.id) ? ' picked' : ''), onClick: () => openDetail(s) },
+                h('h4', null,
+                  h('input', { type: 'checkbox', className: 'smx-check', checked: sel.has(s.id), onChange: () => toggleSel(s.id), onClick: (e) => e.stopPropagation() }),
+                  s.alias || s.name, s.conflict ? h('span', { className: 'smx-badge warn' }, '⚠ ' + t('conflict')) : null,
+                ),
                 h('div', { className: 'id' }, s.id),
                 s.description ? h('div', { className: 'desc' }, s.description) : null,
                 h('div', { className: 'smx-badges' },
-                  h('span', { className: 'smx-badge cat' }, catLabel(s.category)),
+                  h(CatMoveMenu, { api, skill: s, categories, t, onApplied: async (errMsg) => { if (errMsg) { setNotice(errMsg); return } const fresh = await load(); syncDetail(fresh) } }),
                   s.tools.map((toolName) => h('span', { key: toolName, className: 'smx-badge' }, toolName)),
                   s.installCount > 1 ? h('span', { className: 'smx-badge' }, `${s.installCount} ${t('sites')}`) : null,
                   s.readOnly ? h('span', { className: 'smx-badge ro' }, '🔒 ' + t('readOnly')) : null,
+                  (s.collections ?? []).length ? h('span', { className: 'smx-badge', title: t('collections') }, `◈ ${(s.collections ?? []).length}`) : null,
                 ),
               ))),
             ),
@@ -580,6 +814,30 @@ window.__ModuleLoader__.load({
                 h('select', { className: 'smx-select', value: detail.skill.category, onChange: (e) => setSkillCategory(detail.skill, e.target.value) },
                   h('option', { value: 'auto' }, t('autoCategory')),
                   categories.map((c) => h('option', { key: c.id, value: c.id }, c.label)),
+                ),
+              ),
+              h('div', { className: 'sec' },
+                h('h5', null, t('collections')),
+                h('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px' } },
+                  collections.map((c) => h('label', { key: c.id, className: 'smx-colrow' },
+                    h('input', {
+                      type: 'checkbox',
+                      checked: (detail.skill.collections ?? []).includes(c.id),
+                      onChange: async (e) => {
+                        const r = e.target.checked
+                          ? await api.addToCollection({ collection: c.id, names: [detail.skill.id] })
+                          : await api.removeFromCollection({ collection: c.id, names: [detail.skill.id] })
+                        if (r.error) { setNotice(r.error); return }
+                        syncDetail(r.value)
+                      },
+                    }),
+                    h('span', null, c.label),
+                  )),
+                  collections.length === 0 ? h('div', { className: 'smx-note' }, t('collectionEmpty')) : null,
+                ),
+                h('div', { className: 'smx-row', style: { marginTop: '6px' } },
+                  h('input', { className: 'smx-input', style: { flex: '1', minWidth: 0, height: 28 }, placeholder: t('newCollection') + '…', value: newColl, onChange: (e) => setNewColl(e.target.value), onKeyDown: async (e) => { if (e.key === 'Enter') createCollFor(detail.skill) } }),
+                  h('button', { className: 'smx-btn', onClick: () => createCollFor(detail.skill) }, t('confirm')),
                 ),
               ),
               h('div', { className: 'sec' },
@@ -620,7 +878,8 @@ window.__ModuleLoader__.load({
 
         // dialogs
         dialog === 'install' ? h(InstallDialog, { api, roots: data?.roots ?? [], t, onClose: () => setDialog(null), onDone: (v) => { if (v?.catalog) setData(v.catalog); else load() } }) : null,
-        dialog === 'cat' ? h(CategoryDialog, { api, categories, t, onClose: () => setDialog(null), onDone: () => load() }) : null,
+        dialog === 'cat' ? h(CategoryDialog, { api, categories, t, onClose: () => setDialog(null), onDone: (cats) => { if (cats) load() } }) : null,
+        dialog === 'coll' ? h(CollectionDialog, { api, collections, t, onClose: () => setDialog(null), onDone: (fresh) => { if (fresh) { setData(fresh); syncDetail(fresh) } } }) : null,
         dialog === 'trash' ? h(TrashDialog, { api, t, onClose: () => setDialog(null), onDone: (cat) => { if (cat) setData(cat) } }) : null,
         dialog === 'export' ? h(ExportDialog, { api, t, onClose: () => setDialog(null) }) : null,
       )
@@ -665,6 +924,11 @@ window.__ModuleLoader__.load({
         roots: call('roots'),
         updateCategory: call('updateCategory'),
         createCategory: call('createCategory'),
+        createCollection: call('createCollection'),
+        renameCollection: call('renameCollection'),
+        deleteCollection: call('deleteCollection'),
+        addToCollection: call('addToCollection'),
+        removeFromCollection: call('removeFromCollection'),
         renameCategory: call('renameCategory'),
         deleteCategory: call('deleteCategory'),
         setAlias: call('setAlias'),

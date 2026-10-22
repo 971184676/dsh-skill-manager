@@ -35,7 +35,7 @@ import {
   SKILL_FILE, NAME_RE, MAX_SCAN_DEPTH, basenameSafe,
   discoverUnderRoot, readSkillMeta, parseFrontmatter,
   normalizeId, classify, effectiveCategories, mergeInstallations, groupBy,
-  isAbsent, pathExists,
+  attachCollections, isAbsent, pathExists,
 } from './lib/skill-model.js'
 
 //#region constants
@@ -219,7 +219,7 @@ export class SkillManagerService extends TypertRemoteService {
     const cfg = SkillManagerService.Config(config)
     this.config = cfg
     this.store = new Store(cfg.home !== '' ? cfg.home : dshHomePath('skill-manager'))
-    this.catalog = { categories: [], overrides: {}, aliases: {}, favorites: {}, roots: [] }
+    this.catalog = { categories: [], collections: [], overrides: {}, aliases: {}, favorites: {}, roots: [] }
     this.cache = { at: 0, data: undefined }
     this.pendingScan = undefined
     this.loaded = false
@@ -236,6 +236,7 @@ export class SkillManagerService extends TypertRemoteService {
     const persisted = await this.store.readJson(this.store.catalogFile, undefined)
     if (persisted) this.catalog = {
       categories: Array.isArray(persisted.categories) ? persisted.categories : [],
+      collections: Array.isArray(persisted.collections) ? persisted.collections : [],
       overrides: persisted.overrides ?? {},
       aliases: persisted.aliases ?? {},
       favorites: persisted.favorites ?? {},
@@ -339,11 +340,17 @@ export class SkillManagerService extends TypertRemoteService {
     }
     const categoryCounts = {}
     for (const s of skills) categoryCounts[s.category] = (categoryCounts[s.category] ?? 0) + 1
+    // Collections (合集) are user-defined groups that may hold any number of
+    // skills; membership is keyed by skill id and survives re-scan. Stale
+    // entries for skills that no longer exist are pruned in one pass so the UI
+    // never shows ghosts, and the pruned set is what gets persisted.
+    this.catalog.collections = attachCollections(skills, this.catalog.collections)
     const toolSet = new Set(roots.filter((r) => r.present).map((r) => r.tool))
     const data = {
       generatedAt: now,
       skills,
       categories: categories.map((c) => ({ ...c, count: categoryCounts[c.id] ?? 0 })),
+      collections: this.catalog.collections.map((c) => ({ ...c, count: c.skillIds.length })),
       stats: {
         tools: [...toolSet],
         toolCount: toolSet.size,
@@ -437,6 +444,86 @@ export class SkillManagerService extends TypertRemoteService {
     this.cache.at = 0
     return { ok: true, categories: this.effectiveCategories() }
   }
+
+  //#region collections (user-defined skill groups)
+  /** Validate every requested skill id against the live scan. */
+  async resolveSkillIds(signal, names) {
+    for (const n of names ?? []) {
+      const id = normalizeId(n)
+      if (!id) continue
+      if (!(await this.findSkill(id))) fail('skill-manager/not-found', `skill "${id}" not found`)
+    }
+  }
+
+  async createCollection(request, signal) {
+    signal?.throwIfAborted()
+    await this.ensureLoaded()
+    const label = String(request?.label ?? '').trim()
+    if (!label) fail('skill-manager/bad-request', 'label is required')
+    const id = normalizeId(label)
+    const existing = this.catalog.collections.find((c) => c.id === id)
+    if (existing) existing.label = label
+    else this.catalog.collections.push({ id, label, skillIds: [] })
+    await this.persist()
+    this.cache.at = 0
+    return await this.scan(signal)
+  }
+
+  async renameCollection(request, signal) {
+    signal?.throwIfAborted()
+    await this.ensureLoaded()
+    const from = normalizeId(request?.from)
+    const toLabel = String(request?.to ?? '').trim()
+    if (!from || !toLabel) fail('skill-manager/bad-request', 'from and to are required')
+    const to = normalizeId(toLabel)
+    const col = this.catalog.collections.find((c) => c.id === from)
+    if (col) {
+      if (to !== from && !this.catalog.collections.some((c) => c.id === to)) col.id = to
+      col.label = toLabel
+    }
+    await this.persist()
+    this.cache.at = 0
+    return await this.scan(signal)
+  }
+
+  async deleteCollection(request, signal) {
+    signal?.throwIfAborted()
+    await this.ensureLoaded()
+    const id = normalizeId(request?.name)
+    this.catalog.collections = this.catalog.collections.filter((c) => c.id !== id)
+    await this.persist()
+    this.cache.at = 0
+    return await this.scan(signal)
+  }
+
+  async addToCollection(request, signal) {
+    signal?.throwIfAborted()
+    await this.ensureLoaded()
+    await this.resolveSkillIds(signal, request?.names)
+    const col = this.catalog.collections.find((c) => c.id === normalizeId(request?.collection))
+    if (!col) fail('skill-manager/not-found', `collection "${request?.collection}" not found`)
+    const ids = new Set(col.skillIds)
+    for (const n of request?.names ?? []) ids.add(normalizeId(n))
+    col.skillIds = [...ids]
+    await this.persist()
+    this.cache.at = 0
+    await this.store.log(`collection +${col.id} -> ${col.skillIds.length} members`)
+    return await this.scan(signal)
+  }
+
+  async removeFromCollection(request, signal) {
+    signal?.throwIfAborted()
+    await this.ensureLoaded()
+    const col = this.catalog.collections.find((c) => c.id === normalizeId(request?.collection))
+    if (!col) fail('skill-manager/not-found', `collection "${request?.collection}" not found`)
+    const drop = new Set((request?.names ?? []).map((n) => normalizeId(n)).filter(Boolean))
+    col.skillIds = col.skillIds.filter((id) => !drop.has(id))
+    await this.persist()
+    this.cache.at = 0
+    await this.store.log(`collection -${col.id} -> ${col.skillIds.length} members`)
+    return await this.scan(signal)
+  }
+  //#endregion
 
   async setAlias(request, signal) {
     signal?.throwIfAborted()
@@ -681,16 +768,26 @@ export class SkillManagerService extends TypertRemoteService {
           lines.push(`- **${s.alias ?? s.name}** \`${s.id}\`${s.conflict ? ' ⚠️' : ''}`)
           if (s.description) lines.push(`  - ${s.description}`)
           lines.push(`  - 安装于: ${s.installations.map((i) => i.tool).join(', ')}${s.readOnly ? ' (只读)' : ''}`)
+          if (s.collections?.length) {
+            const labels = s.collections.map((cid) => data.collections.find((c) => c.id === cid)?.label ?? cid).join(', ')
+            lines.push(`  - 合集: ${labels}`)
+          }
         }
+        lines.push('')
+      }
+      if (data.collections.length) {
+        lines.push(`## 合集 (共 ${data.collections.length} 个)`, '')
+        for (const c of data.collections) lines.push(`- **${c.label}** (${c.skillIds.length} 个技能)`)
         lines.push('')
       }
       return { filename: `skills-${stamp}.md`, content: lines.join('\n'), mime: 'text/markdown' }
     }
     if (format === 'csv') {
       const esc = (v) => `"${String(v ?? '').replaceAll('"', '""')}"`
-      const rows = [['id', 'name', 'category', 'tools', 'installCount', 'conflict', 'readOnly', 'description'].map(esc).join(',')]
+      const rows = [['id', 'name', 'category', 'collections', 'tools', 'installCount', 'conflict', 'readOnly', 'description'].map(esc).join(',')]
       for (const s of data.skills) {
-        rows.push([s.id, s.name, s.category, s.tools.join('|'), s.installCount, s.conflict, s.readOnly, s.description].map(esc).join(','))
+        const collLabels = (s.collections ?? []).map((cid) => data.collections.find((c) => c.id === cid)?.label ?? cid).join('|')
+        rows.push([s.id, s.name, s.category, collLabels, s.tools.join('|'), s.installCount, s.conflict, s.readOnly, s.description].map(esc).join(','))
       }
       return { filename: `skills-${stamp}.csv`, content: '\ufeff' + rows.join('\n'), mime: 'text/csv' }
     }
@@ -729,6 +826,11 @@ applyRemoteMarkers(SkillManagerService, {
   createCategory: 'createCategory',
   renameCategory: 'renameCategory',
   deleteCategory: 'deleteCategory',
+  createCollection: 'createCollection',
+  renameCollection: 'renameCollection',
+  deleteCollection: 'deleteCollection',
+  addToCollection: 'addToCollection',
+  removeFromCollection: 'removeFromCollection',
   setAlias: 'setAlias',
   setFavorite: 'setFavorite',
   configure: 'configure',
